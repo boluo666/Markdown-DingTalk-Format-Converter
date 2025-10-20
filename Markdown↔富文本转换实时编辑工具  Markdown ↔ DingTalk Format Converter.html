@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Markdown↔富文本转换实时编辑工具 / Markdown ↔ DingTalk Format Converter</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/turndown/lib/turndown.browser.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            max-width: 1300px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 40px;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+        textarea {
+            width: 100%;
+            height: 500px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            resize: vertical;
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .right-panel {
+            display: grid;
+            grid-template-rows: 1fr 1fr;
+            gap: 30px;
+        }
+        #editor {
+            border: 2px solid #e9ecef;
+            padding: 20px;
+            height: 200px;
+            overflow-y: auto;
+            background: #fff;
+            border-radius: 6px;
+            outline: none;
+            box-sizing: border-box;
+        }
+        #editor[contenteditable]:focus {
+            border-color: #4CAF50;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+        }
+        #preview {
+            border: 2px solid #e9ecef;
+            padding: 20px;
+            height: 200px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        .button-group {
+            margin-top: 40px;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+        }
+        button {
+            padding: 12px 35px; /* 增加内边距以容纳图标和双语文本 */
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            color: white;
+            transition: transform 0.2s;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px; /* 图标与文本间距 */
+            font-size: 14px; /* 减小字体以适应双语文本 */
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        #syncBtn { background: #4CAF50; }
+        #copyMarkdownBtn { background: #2196F3; }
+        #copyRichTextBtn { background: #FF5252; }
+        #downloadBtn { background: #FFA500; }
+        h2 {
+            color: #2d3436;
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 24px; /* 标题字体略小 */
+        }
+        h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 16px; /* 减小字体 */
+        }
+        .icon {
+            font-size: 16px; /* 图标大小 */
+        }
+    </style>
+</head>
+<body>
+    <h2>Markdown↔富文本转换实时编辑工具 / Markdown ↔ DingTalk Format Converter</h2>
+    <div class="container">
+        <div>
+            <h3>Markdown 输入 / Markdown Input</h3>
+            <textarea id="input" placeholder="输入 Markdown 内容... / Enter Markdown content..."></textarea>
+        </div>
+        <div class="right-panel">
+            <div>
+                <h3>富文本编辑 / Rich Text Editor</h3>
+                <div id="editor" contenteditable="true" placeholder="在这里编辑富文本内容... / Edit rich text content here..."></div>
+            </div>
+            <div>
+                <h3>实时预览 / Real-time Preview</h3>
+                <div id="preview"></div>
+            </div>
+        </div>
+    </div>
+    <div class="button-group">
+        <button id="syncBtn" onclick="syncToMarkdown()">
+            <span class="icon">↔️</span> 同步到 Markdown / Sync to Markdown
+        </button>
+        <button id="copyMarkdownBtn" onclick="copyMarkdown()">
+            <span class="icon">📋</span> 复制 Markdown 到剪贴板 / Copy Markdown to Clipboard
+        </button>
+        <button id="copyRichTextBtn" onclick="copyRichText()">
+            <span class="icon">🖋️</span> 复制富文本 / Copy Rich Text
+        </button>
+        <button id="downloadBtn" onclick="downloadWord()">
+            <span class="icon">💾</span> 下载 Word 文档 / Download Word Document
+        </button>
+    </div>
+
+    <script>
+        // 初始化 Markdown 解析器
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+
+        // DOM 元素
+        const input = document.getElementById('input');
+        const editor = document.getElementById('editor');
+        const preview = document.getElementById('preview');
+
+        // 左侧 Markdown 输入实时同步到编辑框和预览框
+        input.addEventListener('input', () => {
+            const htmlContent = marked.parse(input.value);
+            editor.innerHTML = htmlContent;
+            preview.innerHTML = htmlContent;
+        });
+
+        // 富文本编辑框实时同步到预览框
+        editor.addEventListener('input', () => {
+            preview.innerHTML = editor.innerHTML;
+        });
+
+        // 同步富文本内容到 Markdown 输入框
+        function syncToMarkdown() {
+            const htmlContent = editor.innerHTML;
+            const turndownService = new TurndownService();
+            const markdownContent = turndownService.turndown(htmlContent);
+            input.value = markdownContent;
+        }
+
+        // 复制 Markdown 到剪贴板
+        function copyMarkdown() {
+            const htmlContent = editor.innerHTML;
+            const turndownService = new TurndownService();
+            const markdownContent = turndownService.turndown(htmlContent);
+            navigator.clipboard.writeText(markdownContent).then(() => {
+                alert('Markdown 内容已复制到剪贴板！ / Markdown content has been copied to clipboard!');
+            });
+        }
+
+        // 复制富文本（HTML）到剪贴板
+        function copyRichText() {
+            const htmlContent = preview.innerHTML;
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const clipboardItem = new ClipboardItem({ 'text/html': blob });
+
+            navigator.clipboard.write([clipboardItem]).then(() => {
+                alert('富文本内容已复制！\n请粘贴到支持富文本的应用中 / Rich text content has been copied!\nPlease paste into an application that supports rich text');
+            }).catch(err => {
+                console.error('复制失败:', err);
+                alert('复制失败，请尝试手动复制或检查浏览器权限 / Copy failed, please try manual copy or check browser permissions');
+            });
+        }
+
+        // 下载 Word 文档功能
+        function downloadWord() {
+            const fullHtml = `
+                <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <style>
+                            body { font-family: 'Microsoft YaHei', sans-serif; }
+                            h1 { border-bottom: 2px solid #ddd; padding-bottom: 0.3em; }
+                            table { border-collapse: collapse; margin: 1em 0; }
+                            td, th { border: 1px solid #ddd; padding: 6px 13px; }
+                        </style>
+                    </head>
+                    <body>
+                        ${preview.innerHTML}
+                    </body>
+                </html>
+            `;
+            
+            const blob = htmlDocx.asBlob(fullHtml);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `文档_${new Date().toLocaleDateString().replace(/\//g, '-')}.docx`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
